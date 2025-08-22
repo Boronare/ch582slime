@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "ch58x_common.h": "c",
+        "ch32v30x_usb.h": "c",
+        "stdint.h": "c",
+        "usb_desc.h": "c",
+        "ch58x_timer.h": "c",
+        "config.h": "c",
+        "hal.h": "c",
+        "freertos.h": "c",
+        "gattprofile.h": "c",
+        "task.h": "c",
+        "app_usb.h": "c",
+        "peripheral.h": "c"
+    }
+}
