@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-
+#define LOG_INFO(fmt, ...) cdc_printf("[INFO] " fmt"\n", ##__VA_ARGS__)
 
 extern void app_usb_init(void);
 
@@ -23,7 +23,7 @@ extern void USBSendData( uint8_t *SendBuf, uint8_t l);
 /*********************************************************************
 *********************************************************************/
 
-void cdc_printf(const char *fmt, ...);
+uint8_t cdc_printf(const char *fmt, ...);
 #ifdef __cplusplus
 }
 #endif

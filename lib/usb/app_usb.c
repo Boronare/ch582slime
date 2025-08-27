@@ -2,7 +2,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-void cdc_printf(const char *fmt, ...)
+uint8_t cdc_printf(const char *fmt, ...)
 {
   char buf[128];
   va_list ap;
@@ -13,21 +13,7 @@ void cdc_printf(const char *fmt, ...)
     if (len > sizeof(buf)) len = sizeof(buf);
     USBSendData((uint8_t*)buf, len);
   }
-}
-// Redirect printf output to USB CDC
-#include <string.h>
-int __attribute__((weak)) _write(int file, char *ptr, int len)
-{
-  if (file == 1 || file == 2) {
-    while (len > 0) {
-      int chunk = len > 64 ? 64 : len;
-      USBSendData((char*)ptr, chunk);
-      ptr += chunk;
-      len -= chunk;
-    }
-    return len;
-  }
-  return -1;
+  return 0;
 }
 /********************************** (C) COPYRIGHT *******************************
  * File Name          : app_usb.c
@@ -43,12 +29,9 @@ int __attribute__((weak)) _write(int file, char *ptr, int len)
  * INCLUDES
  */
 
-#include "config.h"
-#include "gattprofile.h"
 #include "stdint.h"
-#include "ble_usb_service.h"
 #include "app_usb.h"
-#include "peripheral.h"
+#include "CH58x_common.h"
 
 /*********************************************************************
  * MACROS
@@ -63,7 +46,8 @@ UINT16 SetupReqLen;
 const uint8_t *pDescr;
 
 #define DevEP0SIZE  0x40
-// 设备描述符
+// 设备描述符 (Device Descriptor)
+// USB 장치의 기본 정보(버전, 클래스, VID/PID 등)를 정의합니다.
 const uint8_t MyDevDescr[] = {  0x12, //bLength
                                 0x01, //bDescriptorType
                                 0x10,0x01, //bcdUSB
@@ -78,19 +62,25 @@ const uint8_t MyDevDescr[] = {  0x12, //bLength
                                 0x02,
                                 0x00,
                                 0x01 };
-// 配置描述符
+// 配置描述符 (Configuration Descriptor)
+// USB 장치의 전체 구조(인터페이스, 엔드포인트 등)를 정의합니다.
 const uint8_t MyCfgDescr[] = {   0x09,0x02,0x27,0x00,0x01,0x01,0x00,0x80,0xf0,              //配置描述符，接口描述符,端点描述符
                                  0x09,0x04,0x00,0x00,0x03,0xff,0x01,0x02,0x00,
                                  0x07,0x05,0x82,0x02,0x20,0x00,0x00,                        //批量上传端点
                                  0x07,0x05,0x02,0x02,0x20,0x00,0x00,                        //批量下传端点
                                  0x07,0x05,0x81,0x03,0x08,0x00,0x01};                       //中断上传端点
-// 语言描述符
+// 语言描述符 (Language Descriptor)
+// 지원하는 언어(예: 영어, 중국어 등)를 정의합니다.
+// 0x0409 = English (United States)
 const uint8_t MyLangDescr[] = { 0x04, 0x03, 0x09, 0x04 };
-// 厂家信息
+// 厂家信息 (Manufacturer String)
+// 제조사 정보를 USB 문자열로 제공합니다.
 const uint8_t MyManuInfo[] = { 0x0E, 0x03, 'w', 0, 'c', 0, 'h', 0, '.', 0, 'c', 0, 'n', 0 };
-// 产品信息
+// 产品信息 (Product String)
+// 제품 정보를 USB 문자열로 제공합니다.
 const uint8_t MyProdInfo[] = { 0x0C, 0x03, 'C', 0, 'H', 0, '5', 0, '7', 0, 'x', 0 };
-/*产品描述符*/
+/*제품 설명자 (Product String Descriptor)*/
+// 제품 이름을 유니코드로 표현한 문자열입니다.
 const uint8_t StrDesc[28] =
 {
   0x1C,0x03,0x55,0x00,0x53,0x00,0x42,0x00,
@@ -107,7 +97,8 @@ const uint8_t Return3[2] = {0x9F,0xEE};
  * LOCAL VARIABLES
  */
 
-/******** 用户自定义分配端点RAM ****************************************/
+// -------- 사용자 정의 엔드포인트 버퍼 영역 --------
+// 각 엔드포인트별로 USB 데이터 버퍼를 할당합니다.
 __attribute__((aligned(4)))  uint8_t EP0_Databuf[64 + 64 + 64];    //ep0(64)+ep4_out(64)+ep4_in(64)
 __attribute__((aligned(4)))  uint8_t EP1_Databuf[64 + 64];    //ep1_out(64)+ep1_in(64)
 __attribute__((aligned(4)))  uint8_t EP2_Databuf[64 + 64];    //ep2_out(64)+ep2_in(64)
@@ -120,9 +111,10 @@ __attribute__((aligned(4)))  uint8_t EP3_Databuf[64 + 64];    //ep3_out(64)+ep3_
 /*********************************************************************
  * @fn      app_usb_init
  *
- * @brief   初始化usb
+ * @brief   USB 초기화 함수
+ *          USB 엔드포인트 버퍼를 할당하고, USB 장치를 초기화합니다.
  *
- * @return  none
+ * @return  없음
  */
 void app_usb_init()
 {
@@ -138,9 +130,10 @@ void app_usb_init()
 /*********************************************************************
  * @fn      USBSendData
  *
- * @brief   发送数据给主机
+ * @brief   USB CDC IN 엔드포인트로 데이터 전송
+ *          USB를 통해 PC(호스트)로 데이터를 보냅니다.
  *
- * @return  none
+ * @return  없음
  */
 void USBSendData( uint8_t *SendBuf, uint8_t l)
 {
@@ -151,9 +144,10 @@ void USBSendData( uint8_t *SendBuf, uint8_t l)
 /*********************************************************************
  * @fn      DevEP1_OUT_Deal
  *
- * @brief   端点1数据处理
+ * @brief   엔드포인트 1(OUT) 데이터 처리
+ *          필요시 사용자 정의 처리 코드를 작성합니다.
  *
- * @return  none
+ * @return  없음
  */
 void DevEP1_OUT_Deal( uint8_t l )
 { /* 用户可自定义 */
@@ -162,23 +156,22 @@ void DevEP1_OUT_Deal( uint8_t l )
 /*********************************************************************
  * @fn      DevEP2_OUT_Deal
  *
- * @brief   端点2数据处理
+ * @brief   엔드포인트 2(OUT) 데이터 처리
+ *          USB CDC로 수신된 데이터를 BLE 등으로 전달하거나, 에코 처리할 수 있습니다.
  *
- * @return  none
+ * @return  없음
  */
 void DevEP2_OUT_Deal( uint8_t l )
 { /* 用户可自定义 */
-  uint8_t i;
-
-  app_usb_notify(pEP2_OUT_DataBuf, l);
 }
 
 /*********************************************************************
  * @fn      DevEP3_OUT_Deal
  *
- * @brief   端点3数据处理
+ * @brief   엔드포인트 3(OUT) 데이터 처리
+ *          필요시 사용자 정의 처리 코드를 작성합니다.
  *
- * @return  none
+ * @return  없음
  */
 void DevEP3_OUT_Deal( uint8_t l )
 { /* 用户可自定义 */
@@ -187,9 +180,10 @@ void DevEP3_OUT_Deal( uint8_t l )
 /*********************************************************************
  * @fn      DevEP4_OUT_Deal
  *
- * @brief   端点4数据处理
+ * @brief   엔드포인트 4(OUT) 데이터 처리
+ *          필요시 사용자 정의 처리 코드를 작성합니다.
  *
- * @return  none
+ * @return  없음
  */
 void DevEP4_OUT_Deal( uint8_t l )
 { /* 用户可自定义 */
@@ -198,9 +192,10 @@ void DevEP4_OUT_Deal( uint8_t l )
 /*********************************************************************
  * @fn      USB_DevTransProcess
  *
- * @brief   USB 传输处理函数
+ * @brief   USB 데이터 전송 및 제어 처리 함수
+ *          USB 인터럽트에서 호출되며, 각 엔드포인트의 데이터 처리 및 표준/클래스 요청을 처리합니다.
  *
- * @return  none
+ * @return  없음
  */
 void USB_DevTransProcess( void )
 {
@@ -210,10 +205,10 @@ void USB_DevTransProcess( void )
   intflag = R8_USB_INT_FG;
   if ( intflag & RB_UIF_TRANSFER )
   {
-    if ( ( R8_USB_INT_ST & MASK_UIS_TOKEN ) != MASK_UIS_TOKEN )    // 非空闲
+  if ( ( R8_USB_INT_ST & MASK_UIS_TOKEN ) != MASK_UIS_TOKEN )    // USB가 실제 데이터 전송 중일 때(비유휴 상태)
     {
       switch ( R8_USB_INT_ST & ( MASK_UIS_TOKEN | MASK_UIS_ENDP ) )
-      // 分析操作令牌和端点号
+  // USB 토큰 및 엔드포인트 번호 분석
       {
         case UIS_TOKEN_IN :
         {
@@ -249,7 +244,7 @@ void USB_DevTransProcess( void )
         case UIS_TOKEN_OUT | 1 :
         {
           if ( R8_USB_INT_ST & RB_UIS_TOG_OK )
-          {                       // 不同步的数据包将丢弃
+          {                       // 동기화되지 않은 데이터 패킷은 무시됨
             len = R8_USB_RX_LEN;
             DevEP1_OUT_Deal( len );
           }
@@ -309,7 +304,7 @@ void USB_DevTransProcess( void )
       }
       R8_USB_INT_FG = RB_UIF_TRANSFER;
     }
-    if ( R8_USB_INT_ST & RB_UIS_SETUP_ACT )                  // Setup包处理
+  if ( R8_USB_INT_ST & RB_UIS_SETUP_ACT )                  // Setup 패킷 처리(제어 전송)
     {
       R8_UEP0_CTRL = RB_UEP_R_TOG | RB_UEP_T_TOG | UEP_R_RES_ACK | UEP_T_RES_NAK;
       SetupReqLen = pSetupReqPak->wLength;
@@ -351,7 +346,7 @@ void USB_DevTransProcess( void )
           len = 0;
         }
       }
-      else /* 标准请求 */
+  else /* 표준 USB 요청 처리 */
       {
         switch ( SetupReqCode )
         {
@@ -419,7 +414,7 @@ void USB_DevTransProcess( void )
                 break;
             }
             if ( SetupReqLen > len )
-              SetupReqLen = len;      //实际需上传总长度
+              SetupReqLen = len;      // 실제로 전송할 총 길이
             len = ( SetupReqLen >= DevEP0SIZE ) ?
                 DevEP0SIZE : SetupReqLen;
             memcpy( pEP0_DataBuf, pDescr, len );
@@ -494,31 +489,31 @@ void USB_DevTransProcess( void )
       }
       else
       {
-        if ( chtype & 0x80 )     // 上传
+  if ( chtype & 0x80 )     // 업로드(호스트로 데이터 전송)
         {
           len = ( SetupReqLen > DevEP0SIZE ) ?
               DevEP0SIZE : SetupReqLen;
           SetupReqLen -= len;
         }
         else
-          len = 0;        // 下传
-        R8_UEP0_T_LEN = len;
-        R8_UEP0_CTRL = RB_UEP_R_TOG | RB_UEP_T_TOG | UEP_R_RES_ACK | UEP_T_RES_ACK;    // 默认数据包是DATA1
+          len = 0;        // 다운로드(호스트에서 데이터 수신)
+  R8_UEP0_T_LEN = len;
+  R8_UEP0_CTRL = RB_UEP_R_TOG | RB_UEP_T_TOG | UEP_R_RES_ACK | UEP_T_RES_ACK;    // 기본 데이터 패킷은 DATA1
       }
 
       R8_USB_INT_FG = RB_UIF_TRANSFER;
     }
   }
-  else if ( intflag & RB_UIF_BUS_RST )
+  else if ( intflag & RB_UIF_BUS_RST ) // USB 버스 리셋 처리
   {
     R8_USB_DEV_AD = 0;
     R8_UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
     R8_UEP1_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK | RB_UEP_AUTO_TOG;
     R8_UEP2_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK | RB_UEP_AUTO_TOG;
     R8_UEP3_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK | RB_UEP_AUTO_TOG;
-    R8_USB_INT_FG = RB_UIF_BUS_RST;
+  R8_USB_INT_FG = RB_UIF_BUS_RST; // 리셋 후 엔드포인트 초기화
   }
-  else if ( intflag & RB_UIF_SUSPEND )
+  else if ( intflag & RB_UIF_SUSPEND ) // USB 서스펜드/웨이크업 처리
   {
     if ( R8_USB_MIS_ST & RB_UMS_SUSPEND )
     {
@@ -528,7 +523,7 @@ void USB_DevTransProcess( void )
     {
       ;
     }               // 唤醒
-    R8_USB_INT_FG = RB_UIF_SUSPEND;
+  R8_USB_INT_FG = RB_UIF_SUSPEND; // 서스펜드/웨이크업 상태 갱신
   }
   else
   {
@@ -539,9 +534,10 @@ void USB_DevTransProcess( void )
 /*********************************************************************
  * @fn      USB_IRQHandler
  *
- * @brief   USB中断函数
+ * @brief   USB 인터럽트 핸들러
+ *          USB 인터럽트 발생 시 데이터 및 제어 처리를 담당합니다.
  *
- * @return  none
+ * @return  없음
  */
 __attribute__((interrupt("WCH-Interrupt-fast")))
 __attribute__((section(".highcode")))

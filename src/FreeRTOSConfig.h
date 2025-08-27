@@ -105,7 +105,7 @@
 #define configMAX_PRIORITIES			( 15 )
 #define configMINIMAL_STACK_SIZE		( ( unsigned short ) 128 ) /* Can be as low as 60 but some of the demo tasks that use this constant require it to be higher. */
 #if defined(CH58X)
-#define configTOTAL_HEAP_SIZE			( ( size_t ) ( 8 * 1024 ) )
+#define configTOTAL_HEAP_SIZE			( ( size_t ) ( 16 * 1024 ) )
 #elif defined(CH59X)
 #define configTOTAL_HEAP_SIZE			( ( size_t ) ( 8 * 1024 ) )
 #endif
@@ -140,17 +140,17 @@
 
 /* Set the following definitions to 1 to include the API function, or zero
 to exclude the API function. */
-// #define INCLUDE_vTaskPrioritySet			1
-// #define INCLUDE_uxTaskPriorityGet			1
-// #define INCLUDE_vTaskDelete					1
-// #define INCLUDE_vTaskCleanUpResources		1
-// #define INCLUDE_vTaskSuspend				1
-// #define INCLUDE_vTaskDelayUntil				1
+#define INCLUDE_vTaskPrioritySet			1
+#define INCLUDE_uxTaskPriorityGet			1
+#define INCLUDE_vTaskDelete					1
+#define INCLUDE_vTaskCleanUpResources		1
+#define INCLUDE_vTaskSuspend				1
+#define INCLUDE_vTaskDelayUntil				1
 #define INCLUDE_vTaskDelay					1
-// #define INCLUDE_eTaskGetState				1
-// #define INCLUDE_xTimerPendFunctionCall		1
-// #define INCLUDE_xTaskAbortDelay				1
-// #define INCLUDE_xTaskGetHandle				1
+#define INCLUDE_eTaskGetState				1
+#define INCLUDE_xTimerPendFunctionCall		1
+#define INCLUDE_xTaskAbortDelay				1
+#define INCLUDE_xTaskGetHandle				1
 #define INCLUDE_xSemaphoreGetMutexHolder	1
 
 

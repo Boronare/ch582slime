@@ -11,6 +11,7 @@
         "gattprofile.h": "c",
         "task.h": "c",
         "app_usb.h": "c",
-        "peripheral.h": "c"
+        "peripheral.h": "c",
+        "functional": "cpp"
     }
 }
